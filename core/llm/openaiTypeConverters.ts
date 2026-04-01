@@ -970,34 +970,42 @@ function sanitizeResponsesInput(input: ResponseInput): ResponseInput {
   const skipIndices = new Set<number>();
   const stripIdIndices = new Set<number>();
 
+  // Strip IDs from items following a removed reasoning item,
+  // so the API doesn't expect the missing reasoning reference.
+  const stripIdsFromSuccessors = (startIdx: number) => {
+    for (let j = startIdx; j < input.length; j++) {
+      const currentItem = input[j];
+      if (
+        isItemType<ResponseFunctionToolCall>(currentItem, "function_call") ||
+        isItemType<ResponseInputItem & { type: "function_call_output" }>(
+          currentItem,
+          "function_call_output",
+        ) ||
+        ("type" in currentItem && currentItem.type === "message")
+      ) {
+        stripIdIndices.add(j);
+      } else {
+        break;
+      }
+    }
+  };
+
   for (let i = 0; i < input.length; i++) {
     if (!isItemType<ResponseReasoningItem>(input[i], "reasoning")) continue;
     const reasoning = input[i] as ResponseReasoningItem;
 
     if (!reasoning.encrypted_content) {
-      // Can't pass reasoning without encrypted_content; strip id from
-      // subsequent items so the API doesn't expect the missing reasoning
+      // Can't pass reasoning without encrypted_content
       skipIndices.add(i);
-      for (let j = i + 1; j < input.length; j++) {
-        const currentItem = input[j];
-        if (
-          isItemType<ResponseFunctionToolCall>(currentItem, "function_call") ||
-          isItemType<ResponseInputItem & { type: "function_call_output" }>(
-            currentItem,
-            "function_call_output",
-          ) ||
-          ("type" in currentItem && currentItem.type === "message")
-        ) {
-          stripIdIndices.add(j);
-        } else {
-          break;
-        }
-      }
+      stripIdsFromSuccessors(i + 1);
       continue;
     }
 
     if (!isValidSuccessor(input[i + 1])) {
       skipIndices.add(i);
+      // Also strip IDs from any items immediately following this removed
+      // reasoning, because their IDs (e.g. msg_...) reference it.
+      stripIdsFromSuccessors(i + 1);
     }
   }
 
