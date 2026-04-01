@@ -629,9 +629,6 @@ export const sessionSlice = createSlice({
               ) {
                 lastItem.reasoning.text += messageContent;
               }
-            } else {
-              // Note this only works because new message above
-              // was already rendered from parts to string
               if (
                 lastMessage.content.length > 0 ||
                 messageContent.trim().length > 0
@@ -643,6 +640,11 @@ export const sessionSlice = createSlice({
             if (lastMessage.role === "thinking") {
               lastMessage.signature = message.signature;
             }
+          } else if (
+            message.role === "assistant" &&
+            message.toolCalls?.length &&
+            lastMessage.role === "assistant"
+          ) {
             // Detect modality switch (from text content to tool calls)
             const lastContent = lastMessage.content;
             const hasContent =
