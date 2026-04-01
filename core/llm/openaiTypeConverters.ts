@@ -947,15 +947,7 @@ export function isItemType<T extends ResponseInputItem & { type: string }>(
 function isValidSuccessor(item: ResponseInputItem | undefined): boolean {
   if (!item) return false;
   if (isItemType<ResponseFunctionToolCall>(item, "function_call")) return true;
-  if (
-    isItemType<ResponseInputItem & { type: "function_call_output" }>(
-      item,
-      "function_call_output",
-    )
-  )
-    return true;
   if ("type" in item && item.type === "message") return true;
-  if ("type" in item && item.type === "reasoning") return true;
   if ("role" in item && item.role === "assistant") return true;
   return false;
 }
@@ -970,18 +962,13 @@ function sanitizeResponsesInput(input: ResponseInput): ResponseInput {
   const skipIndices = new Set<number>();
   const stripIdIndices = new Set<number>();
 
-  // Strip IDs from items following a removed reasoning item,
-  // so the API doesn't expect the missing reasoning reference.
+  // Strip IDs (e.g. msg_..., fc_...) from items immediately following a
+  // removed reasoning item so the API doesn't reject them as "orphaned".
   const stripIdsFromSuccessors = (startIdx: number) => {
     for (let j = startIdx; j < input.length; j++) {
-      const currentItem = input[j];
       if (
-        isItemType<ResponseFunctionToolCall>(currentItem, "function_call") ||
-        isItemType<ResponseInputItem & { type: "function_call_output" }>(
-          currentItem,
-          "function_call_output",
-        ) ||
-        ("type" in currentItem && currentItem.type === "message")
+        isItemType<ResponseFunctionToolCall>(input[j], "function_call") ||
+        ("type" in input[j] && input[j].type === "message")
       ) {
         stripIdIndices.add(j);
       } else {
@@ -995,7 +982,8 @@ function sanitizeResponsesInput(input: ResponseInput): ResponseInput {
     const reasoning = input[i] as ResponseReasoningItem;
 
     if (!reasoning.encrypted_content) {
-      // Can't pass reasoning without encrypted_content
+      // Can't pass reasoning without encrypted_content; strip id from
+      // subsequent items so the API doesn't expect the missing reasoning
       skipIndices.add(i);
       stripIdsFromSuccessors(i + 1);
       continue;
@@ -1003,8 +991,7 @@ function sanitizeResponsesInput(input: ResponseInput): ResponseInput {
 
     if (!isValidSuccessor(input[i + 1])) {
       skipIndices.add(i);
-      // Also strip IDs from any items immediately following this removed
-      // reasoning, because their IDs (e.g. msg_...) reference it.
+      // Also strip IDs from successors — their IDs reference this reasoning.
       stripIdsFromSuccessors(i + 1);
     }
   }
@@ -1029,13 +1016,13 @@ function sanitizeResponsesInput(input: ResponseInput): ResponseInput {
   }
   return result.filter((item) => {
     if (
-      isItemType<ResponseInputItem & { type: "function_call_output" }>(
+      !isItemType<ResponseInputItem.FunctionCallOutput>(
         item,
         "function_call_output",
       )
     )
-      return validCallIds.has(item.call_id);
-    return true;
+      return true;
+    return validCallIds.has(item.call_id);
   });
 }
 
