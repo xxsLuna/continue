@@ -848,24 +848,17 @@ function toResponseInputContentList(
 
 /**
  * Ensures an ID has the correct prefix (e.g., "msg_", "fc_", "rs_").
- * If the ID already has the prefix, it's returned as is.
- * If it has a different prefix, that prefix is stripped before adding the new one.
+ * If the ID already has a prefix, it is stripped and replaced.
+ * This is crucial for OpenAI o1/o3-mini models which are strict about ID formats.
  */
 function ensurePrefix(
   id: string | undefined,
   prefix: string,
 ): string | undefined {
   if (!id) return undefined;
-  if (id.startsWith(prefix)) return id;
   // Strip existing prefix if any (msg_ is 4 chars, fc_/rs_ are 3 chars)
-  let cleanId = id;
-  if (id.includes("_")) {
-    const underscoreIndex = id.indexOf("_");
-    if (underscoreIndex === 2 || underscoreIndex === 3) {
-      cleanId = id.substring(underscoreIndex + 1);
-    }
-  }
-  return prefix + cleanId;
+  const strippedId = id.includes("_") ? id.split("_")[1] : id;
+  return `${prefix}${strippedId}`;
 }
 
 /**
@@ -877,30 +870,28 @@ function emitFunctionCallsFromToolCalls(
   fcIds: string[],
   input: ResponseInput,
 ): void {
-  for (let i = 0; i < Math.min(toolCalls.length, respIds.length); i++) {
+  for (let i = 0; i < toolCalls.length; i++) {
     const tc = toolCalls[i];
-    const itemId = respIds[i];
+    const fcId = fcIds[i];
 
-    if (itemId) {
-      const name = tc?.function?.name as string | undefined;
-      const args = tc?.function?.arguments as string | undefined;
-      // Extract call_id from tc or itemId
-      const call_id =
-        tc.id ||
-        (itemId.includes("_")
-          ? itemId.substring(itemId.indexOf("_") + 1)
-          : itemId);
+    const name = tc?.function?.name as string | undefined;
+    const args = tc?.function?.arguments as string | undefined;
+    const call_id = tc?.id as string | undefined;
 
-      if (name) {
-        const functionCallItem: ResponseFunctionToolCall = {
-          id: ensurePrefix(itemId, "fc_")!,
-          type: "function_call",
-          name,
-          arguments: typeof args === "string" ? args : "{}",
-          call_id,
-        };
-        input.push(functionCallItem);
+    if (name && call_id) {
+      if (!isValidSuccessor(input[input.length - 1])) {
+        // Reasoning must be followed by a message or function_call
+        input.pop(); // Remove the orphaned reasoning
       }
+
+      const functionCallItem: ResponseFunctionToolCall = {
+        type: "function_call",
+        name,
+        arguments: typeof args === "string" ? args : "{}",
+        call_id: ensurePrefix(call_id, "fc_")!,
+        id: ensurePrefix(fcId, "msg_")!,
+      };
+      input.push(functionCallItem);
     }
   }
 }
@@ -952,8 +943,8 @@ function convertThinkingMessageToReasoningItem(
   if (!id) return undefined;
 
   const reasoningItem: ResponseReasoningItem = {
-    type: "reasoning",
     id: ensurePrefix(id, "rs_")!,
+    type: "reasoning",
     summary: [],
     content: [],
   } as ResponseReasoningItem;
@@ -1067,6 +1058,7 @@ function sanitizeResponsesInput(input: ResponseInput): ResponseInput {
 
 export function toResponsesInput(messages: ChatMessage[]): ResponseInput {
   const input: ResponseInput = [];
+  const itemIdToIndex: Record<string, number> = {};
 
   const pushMessage = (
     role: "user" | "assistant" | "system" | "developer",
@@ -1145,7 +1137,19 @@ export function toResponsesInput(messages: ChatMessage[]): ResponseInput {
         }
 
         if (Array.isArray(toolCalls) && toolCalls.length > 0) {
-          // 2. Handle Assistant Text (Must precede tool calls if present)
+          const tcCount = toolCalls.length;
+          const generatedFcIds = Array.from({ length: tcCount }, (_, i) => {
+            const tc = toolCalls[i];
+            const call_id = tc.id;
+            if (call_id && itemIdToIndex[call_id] === undefined) {
+              itemIdToIndex[call_id] = Object.keys(itemIdToIndex).length;
+            }
+            const idx = call_id ? itemIdToIndex[call_id] : i;
+            return `${(msg as any).id || (msg as any).messageId || "msg"}-${idx}`;
+          });
+
+          emitFunctionCallsFromToolCalls(toolCalls, generatedFcIds, input);
+
           if (text && text.trim()) {
             // Only consume an ID if it's not explicitly an fc_ ID (which belongs to a tool call)
             // or if we have multiple IDs available.
@@ -1159,12 +1163,7 @@ export function toResponsesInput(messages: ChatMessage[]): ResponseInput {
               pushMessage("assistant", text);
             }
           }
-
-          // 3. Handle Tool Calls
-          const remainingRespIds = respIds.slice(currentRespIdIndex);
-          emitFunctionCallsFromToolCalls(toolCalls, remainingRespIds, input);
         } else if (respId) {
-          // No tool calls, just normal assistant message
           const msgId = respIds[currentRespIdIndex] || respId;
           const outputMessageItem: ResponseOutputMessage = {
             id: ensurePrefix(msgId, "msg_")!,
