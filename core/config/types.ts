@@ -389,7 +389,7 @@ declare global {
     completion: string;
   }
   
-  type MessageModes = "chat" | "edit";
+  export type MessageModes = "chat" | "agent" | "plan" | "background" | "validator";
   
   export type ToolStatus =
     | "generating"

@@ -3,6 +3,7 @@ import {
   DEFAULT_AGENT_SYSTEM_MESSAGE,
   DEFAULT_CHAT_SYSTEM_MESSAGE,
   DEFAULT_PLAN_SYSTEM_MESSAGE,
+  DEFAULT_VALIDATOR_SYSTEM_MESSAGE,
 } from "core/llm/defaultSystemMessages";
 
 export const NO_TOOL_WARNING =
@@ -19,6 +20,8 @@ export function getBaseSystemMessage(
     baseMessage = model.baseAgentSystemMessage ?? DEFAULT_AGENT_SYSTEM_MESSAGE;
   } else if (messageMode === "plan") {
     baseMessage = model.basePlanSystemMessage ?? DEFAULT_PLAN_SYSTEM_MESSAGE;
+  } else if (messageMode === "validator") {
+    baseMessage = DEFAULT_VALIDATOR_SYSTEM_MESSAGE;
   } else {
     baseMessage = model.baseChatSystemMessage ?? DEFAULT_CHAT_SYSTEM_MESSAGE;
   }
