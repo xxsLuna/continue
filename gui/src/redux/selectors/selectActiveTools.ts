@@ -29,6 +29,16 @@ export const selectActiveTools = createSelector(
           (t) => t.group !== BUILT_IN_GROUP_NAME || t.readonly,
         );
       }
+      if (mode === "validator") {
+        const allowedTools = [
+          "read_file",
+          "grep_search",
+          "run_terminal_command",
+        ];
+        return enabledTools.filter((t) =>
+          allowedTools.includes(t.function.name),
+        );
+      }
       return enabledTools;
     }
   },
