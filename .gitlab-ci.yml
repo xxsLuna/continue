@@ -1,0 +1,117 @@
+# .gitlab-ci.yml for micube-continue (submodule)
+# This file contains the core build logic for Continue extensions.
+
+stages:
+  - prep
+  - build:shared
+  - build:binary
+  - build:extensions
+  - package
+
+variables:
+  NODE_VERSION: "20"
+  JAVA_VERSION: "17"
+
+# --- [추가] 상위 프로젝트(AX Continue)에서만 실행되도록 제한 ---
+workflow:
+  rules:
+    # 실행 경로가 상위 프로젝트인 경우에만 파이프라인 생성
+    - if: $CI_PROJECT_PATH == "ax-poc/aidd/ax-continue"
+      when: always
+    # 그 외(하위 프로젝트 단독 푸시 등)의 경우는 실행하지 않음
+    - when: never
+
+# 캐시 설정 (빌드 속도 최적화)
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
+    - core/node_modules/
+    - gui/node_modules/
+    - binary/node_modules/
+    - .gradle/
+
+# --- 1. 기초 패키지 빌드 (Foundation) ---
+build:packages:
+  stage: prep
+  tags: [windows-runner-luna]
+  script:
+    - npm ci
+    - node ./scripts/build-packages.js
+  artifacts:
+    paths:
+      - packages/*/out/
+    expire_in: 1 day
+
+# --- 2. 공유 컴포넌트 빌드 (Shared) ---
+build:core:
+  stage: build:shared
+  tags: [windows-runner-luna]
+  needs: ["build:packages"]
+  script:
+    - cd core
+    - npm ci
+  artifacts:
+    paths:
+      - core/node_modules/
+      - core/out/
+
+build:gui:
+  stage: build:shared
+  tags: [windows-runner-luna]
+  needs: ["build:packages"]
+  script:
+    - cd gui
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - gui/out/
+
+# --- 3. 플랫폼별 바이너리 생성 (Native Binary) ---
+.binary_template: &binary_definition
+  stage: build:binary
+  needs: ["build:core"]
+  script:
+    - cd binary
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - binary/bin/
+
+build:binary:windows:
+  <<: *binary_definition
+  tags: [windows-runner-luna]
+
+build:binary:macos:
+  <<: *binary_definition
+  tags: [macos-runner] # 맥 러너 태그 (나중에 등록 필요)
+  when: manual         # 맥 러너가 준비될 때까지 수동 실행으로 대기
+  allow_failure: true
+
+# --- 4. 확장 프로그램 패키징 (Extensions) ---
+build:vscode:windows:
+  stage: build:extensions
+  tags: [windows-runner-luna]
+  needs: ["build:core", "build:gui", "build:binary:windows"]
+  script:
+    - cd extensions/vscode
+    - npm ci
+    - npm run prepackage
+    - npx vsce package --no-dependencies --out ../../build/continue-windows.vsix
+  artifacts:
+    paths:
+      - build/continue-windows.vsix
+
+build:intellij:windows:
+  stage: build:extensions
+  tags: [windows-runner-luna]
+  needs: ["build:core", "build:gui", "build:binary:windows"]
+  script:
+    - cd extensions/intellij
+    - ./gradlew buildPlugin
+    - cp build/distributions/*.zip ../../build/continue-intellij-windows.zip
+  artifacts:
+    paths:
+      - build/continue-intellij-windows.zip
