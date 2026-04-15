@@ -11,6 +11,12 @@ stages:
 variables:
   NODE_VERSION: "20"
   JAVA_VERSION: "17"
+  npm_config_msvs_version: "2022" # node-gyp가 VS2022를 찾도록 명시
+
+# 모든 Job에서 올바른 Node.js 버전을 사용하도록 설정
+default:
+  before_script:
+    - nvm use $NODE_VERSION
 
 # --- [추가] 상위 프로젝트(AX Continue)에서만 실행되도록 제한 ---
 workflow:
