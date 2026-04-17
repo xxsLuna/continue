@@ -1,130 +1,131 @@
-# .gitlab-ci.yml for micube-continue (submodule)
-# This file contains the core build logic for Continue extensions.
+# MICUBE Continue 하이브리드 빌드 파이프라인
+
+variables:
+  NODE_VERSION: "20.12.2"
+  GIT_SUBMODULE_STRATEGY: recursive
+  npm_config_msvs_version: "2022"
 
 stages:
   - prep
-  - build:shared
-  - build:binary
-  - build:extensions
-  - package
+  - core
+  - gui
+  - binary
+  - extensions
 
-variables:
-  NODE_VERSION: "20"
-  JAVA_VERSION: "17"
-  npm_config_msvs_version: "2022" # node-gyp가 VS2022를 찾도록 명시
+# --- 공통 설정 ---
 
-# 모든 Job에서 올바른 Node.js 버전을 사용하도록 설정
 default:
-  image: node:20-windowsservercore-ltsc2022
-  before_script:
-    - |
-      if (Get-Command nvm -ErrorAction SilentlyContinue) {
-        nvm use $NODE_VERSION
-      } else {
-        Write-Host "NVM not found, assuming Node.js is already in PATH (Docker environment)"
-      }
+  interruptible: true
 
-# --- [추가] 상위 프로젝트(AX Continue)에서만 실행되도록 제한 ---
-workflow:
-  rules:
-    # 실행 경로가 상위 프로젝트인 경우에만 파이프라인 생성
-    - if: $CI_PROJECT_PATH == "ax-poc/aidd/ax-continue"
-      when: always
-    # 그 외(하위 프로젝트 단독 푸시 등)의 경우는 실행하지 않음
-    - when: never
+.linux_job:
+  image: node:20-bookworm-slim
+  tags:
+    - linux-runner-luna
 
-# 캐시 설정 (빌드 속도 최적화)
-cache:
-  key: ${CI_COMMIT_REF_SLUG}
-  paths:
-    - node_modules/
-    - core/node_modules/
-    - gui/node_modules/
-    - binary/node_modules/
-    - .gradle/
+.windows_job:
+  image: node:20.12.2-windowsservercore-ltsc2022
+  tags:
+    - windows-runner-luna
 
-# --- 1. 기초 패키지 빌드 (Foundation) ---
+# --- 빌드 단계 정의 ---
+
+# 1. 패키지 설치 (Linux에서 고속 실행)
 build:packages:
+  extends: .linux_job
   stage: prep
-  tags: [windows-runner-luna]
   script:
     - npm ci
     - node ./scripts/build-packages.js
   artifacts:
     paths:
-      - packages/*/out/
-      - packages/*/node_modules/
-    expire_in: 1 day
+      - "packages/*/node_modules/"
+      - "node_modules/"
+    expire_in: 1 hour
 
-# --- 2. 공유 컴포넌트 빌드 (Shared) ---
+# 2. 코어 빌드 (Windows 네이티브 모듈 컴파일)
 build:core:
-  stage: build:shared
-  tags: [windows-runner-luna]
-  needs: ["build:packages"]
+  extends: .windows_job
+  stage: core
+  needs:
+    - build:packages
   script:
     - cd core
     - npm ci
+    - npm run build
   artifacts:
     paths:
-      - core/node_modules/
-      - core/out/
+      - "core/dist/"
+      - "core/node_modules/"
+      - "core/build/"
+    expire_in: 1 hour
 
+# 3. GUI 빌드 (Linux에서 실행)
 build:gui:
-  stage: build:shared
-  tags: [windows-runner-luna]
-  needs: ["build:packages", "build:core"]
+  extends: .linux_job
+  stage: gui
+  needs:
+    - build:packages
   script:
     - cd gui
     - npm ci
     - npm run build
   artifacts:
     paths:
-      - gui/out/
+      - "gui/dist/"
+    expire_in: 1 hour
 
-# --- 3. 플랫폼별 바이너리 생성 (Native Binary) ---
-.binary_template: &binary_definition
-  stage: build:binary
-  needs: ["build:core"]
+# 4. 네이티브 바이너리 빌드 (Windows 전용)
+build:binary:windows:
+  extends: .windows_job
+  stage: binary
+  needs:
+    - build:core
   script:
     - cd binary
     - npm ci
     - npm run build
   artifacts:
     paths:
-      - binary/bin/
+      - "binary/bin/"
+    expire_in: 1 hour
 
-build:binary:windows:
-  <<: *binary_definition
-  tags: [windows-runner-luna]
-
-build:binary:macos:
-  <<: *binary_definition
-  tags: [macos-runner] # 맥 러너 태그 (나중에 등록 필요)
-  when: manual         # 맥 러너가 준비될 때까지 수동 실행으로 대기
-  allow_failure: true
-
-# --- 4. 확장 프로그램 패키징 (Extensions) ---
+# 5. VS Code 확장 프로그램 패키징 (Windows용 바이너리 포함을 위해 Windows에서 수행)
 build:vscode:windows:
-  stage: build:extensions
-  tags: [windows-runner-luna]
-  needs: ["build:core", "build:gui", "build:binary:windows"]
+  extends: .windows_job
+  stage: extensions
+  needs:
+    - build:core
+    - build:gui
+    - build:binary:windows
   script:
     - cd extensions/vscode
     - npm ci
-    - npm run prepackage
-    - npx vsce package --no-dependencies --out ../../build/continue-windows.vsix
+    - npm run package
   artifacts:
     paths:
-      - build/continue-windows.vsix
+      - "extensions/vscode/build/*.vsix"
+    expire_in: 1 week
 
-build:intellij:windows:
-  stage: build:extensions
-  tags: [windows-runner-luna]
-  needs: ["build:core", "build:gui", "build:binary:windows"]
+# 6. IntelliJ 확장 프로그램 빌드 (Linux Gradle 활용)
+build:intellij:linux:
+  extends: .linux_job
+  image: gradle:8.7-jdk17
+  stage: extensions
+  needs:
+    - build:gui
   script:
     - cd extensions/intellij
+    - chmod +x ./gradlew
     - ./gradlew buildPlugin
-    - cp build/distributions/*.zip ../../build/continue-intellij-windows.zip
   artifacts:
     paths:
-      - build/continue-intellij-windows.zip
+      - "extensions/intellij/build/distributions/*.zip"
+    expire_in: 1 week
+
+# --- [제한] 불필요한 파이프라인 방지 ---
+workflow:
+  rules:
+    - if: $CI_PROJECT_NAME == "ax-continue"
+      when: always
+    - if: $CI_PROJECT_NAME == "micube-continue"
+      when: always
