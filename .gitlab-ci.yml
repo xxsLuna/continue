@@ -122,10 +122,11 @@ build:intellij:linux:
       - "extensions/intellij/build/distributions/*.zip"
     expire_in: 1 week
 
-# --- [제한] 불필요한 파이프라인 방지 ---
+# --- [제한] 상위 프로젝트(AX Continue)에서만 실행되도록 제한 ---
 workflow:
   rules:
-    - if: $CI_PROJECT_NAME == "ax-continue"
+    # 실행 경로가 상위 프로젝트인 경우에만 파이프라인 생성
+    - if: $CI_PROJECT_PATH == "ax-poc/aidd/ax-continue"
       when: always
-    - if: $CI_PROJECT_NAME == "micube-continue"
-      when: always
+    # 그 외(하위 프로젝트 단독 푸시 등)의 경우는 파이프라인을 생성하지 않음
+    - when: never
