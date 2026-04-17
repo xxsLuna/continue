@@ -40,11 +40,9 @@ build:packages:
     - node ./scripts/build-packages.js
   artifacts:
     paths:
-      - "packages/*/dist/"
-      - "packages/*/package.json"
-      - "packages/*/node_modules/"
+      - "packages/"
       - "node_modules/"
-    expire_in: 1 hour
+    expire_in: 2 hours
 
 # 2. 코어 빌드 (Windows 네이티브 모듈 컴파일 대신 검증만 수행)
 build:core:
