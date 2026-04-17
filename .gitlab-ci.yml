@@ -23,7 +23,7 @@ default:
     - linux-runner-luna
 
 .windows_job:
-  image: node:20.12.2-windowsservercore-ltsc2022
+  image: npm-windows:20.12
   tags:
     - windows-runner-luna
 
