@@ -57,11 +57,12 @@ build:core:
   needs: ["build:packages"]
   script:
     - cd core
-    - npm ci
+    - npm ci --install-links
+    - npm run build
   artifacts:
     paths:
       - core/node_modules/
-      - core/out/
+      - core/dist/
 
 build:gui:
   stage: build:shared
@@ -73,7 +74,7 @@ build:gui:
     - npm run build
   artifacts:
     paths:
-      - gui/out/
+      - gui/dist/
 
 # --- 3. 플랫폼별 바이너리 생성 (Native Binary) ---
 .binary_template: &binary_definition
