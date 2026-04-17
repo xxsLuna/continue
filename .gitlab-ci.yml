@@ -37,20 +37,20 @@ default:
 .setup_linux:
   extends: .linux_job
   before_script:
-    - npm install
+    - npm ci
     - node ./scripts/build-packages.js
 
 .setup_windows:
   extends: .windows_job
   before_script:
-    - npm install
+    - npm ci
     - node ./scripts/build-packages.js
 
 .setup_mac:
   # extends: .mac_job
   # Mac Runner 준비 시 위 주석 해제 후 사용
   before_script:
-    - npm install
+    - npm ci
     - node ./scripts/build-packages.js
 
 # --- 빌드 단계 정의 ---
@@ -61,7 +61,7 @@ build:core:
   stage: core
   script:
     - cd core
-    - npm install
+    - npm ci
     - npx tsc --noEmit
 
 # 2. GUI 빌드 (Linux에서 실행)
@@ -72,9 +72,9 @@ build:gui:
     NODE_OPTIONS: "--max-old-space-size=4096"
   script:
     - cd core
-    - npm install
+    - npm ci
     - cd ../gui
-    - npm install
+    - npm ci
     - npm run build
   artifacts:
     paths:
@@ -89,7 +89,7 @@ build:binary:windows:
     - build:core
   script:
     - cd binary
-    - npm install
+    - npm ci
     - npm run build
   artifacts:
     paths:
@@ -105,9 +105,9 @@ build:vscode:windows:
     - build:binary:windows
   script:
     - cd core
-    - npm install
+    - npm ci
     - cd ../extensions/vscode
-    - npm install
+    - npm ci
     - npm run package
   artifacts:
     paths:

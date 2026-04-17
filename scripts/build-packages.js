@@ -3,7 +3,7 @@ const path = require("path");
 const fs = require("fs");
 const fsPromises = require("fs/promises");
 
-const npmInstallCmd = "npm install";
+const npmInstallCmd = process.env.CI === "true" ? "npm ci" : "npm install";
 
 function runCommand(command, cwd, packageName) {
   return new Promise((resolve, reject) => {
