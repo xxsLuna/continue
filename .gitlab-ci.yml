@@ -15,8 +15,14 @@ variables:
 
 # 모든 Job에서 올바른 Node.js 버전을 사용하도록 설정
 default:
+  image: node:20-windowsservercore-ltsc2022
   before_script:
-    - nvm use $NODE_VERSION
+    - |
+      if (Get-Command nvm -ErrorAction SilentlyContinue) {
+        nvm use $NODE_VERSION
+      } else {
+        Write-Host "NVM not found, assuming Node.js is already in PATH (Docker environment)"
+      }
 
 # --- [추가] 상위 프로젝트(AX Continue)에서만 실행되도록 제한 ---
 workflow:
