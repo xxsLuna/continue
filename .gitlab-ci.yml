@@ -6,7 +6,6 @@ variables:
   npm_config_msvs_version: "2022"
 
 stages:
-  - prep
   - core
   - gui
   - binary
@@ -29,42 +28,46 @@ default:
   variables:
     NODE_OPTIONS: "--max-old-space-size=4096"
 
-# --- 빌드 단계 정의 ---
+.mac_job:
+  tags:
+    - mac-runner
 
-# 1. 패키지 설치 (Linux에서 고속 실행)
-build:packages:
+# --- OS별 독립 종속성 설정 템플릿 ---
+
+.setup_linux:
   extends: .linux_job
-  stage: prep
-  script:
+  before_script:
     - npm install
     - node ./scripts/build-packages.js
-  artifacts:
-    paths:
-      - "packages/"
-      - "node_modules/"
-    expire_in: 2 hours
 
-# 2. 코어 빌드 (Windows 네이티브 모듈 컴파일 대신 검증만 수행)
-build:core:
+.setup_windows:
   extends: .windows_job
+  before_script:
+    - npm install
+    - node ./scripts/build-packages.js
+
+.setup_mac:
+  # extends: .mac_job
+  # Mac Runner 준비 시 위 주석 해제 후 사용
+  before_script:
+    - npm install
+    - node ./scripts/build-packages.js
+
+# --- 빌드 단계 정의 ---
+
+# 1. 코어 빌드 (Windows 네이티브 모듈 컴파일 대신 검증만 수행)
+build:core:
+  extends: .setup_windows
   stage: core
-  needs:
-    - build:packages
   script:
     - cd core
     - npm install
     - npx tsc --noEmit
-  artifacts:
-    paths:
-      - "core/node_modules/"
-    expire_in: 1 hour
 
-# 3. GUI 빌드 (Linux에서 실행)
+# 2. GUI 빌드 (Linux에서 실행)
 build:gui:
-  extends: .linux_job
+  extends: .setup_linux
   stage: gui
-  needs:
-    - build:packages
   variables:
     NODE_OPTIONS: "--max-old-space-size=4096"
   script:
@@ -78,9 +81,9 @@ build:gui:
       - "gui/dist/"
     expire_in: 1 hour
 
-# 4. 네이티브 바이너리 빌드 (Windows 전용)
+# 3. 네이티브 바이너리 빌드 (Windows 전용)
 build:binary:windows:
-  extends: .windows_job
+  extends: .setup_windows
   stage: binary
   needs:
     - build:core
@@ -93,16 +96,17 @@ build:binary:windows:
       - "binary/bin/"
     expire_in: 1 hour
 
-# 5. VS Code 확장 프로그램 패키징 (Windows용 바이너리 포함을 위해 Windows에서 수행)
+# 4. VS Code 확장 프로그램 패키징 (Windows용 바이너리 포함을 위해 Windows에서 수행)
 build:vscode:windows:
-  extends: .windows_job
+  extends: .setup_windows
   stage: extensions
   needs:
-    - build:core
     - build:gui
     - build:binary:windows
   script:
-    - cd extensions/vscode
+    - cd core
+    - npm install
+    - cd ../extensions/vscode
     - npm install
     - npm run package
   artifacts:
@@ -110,7 +114,7 @@ build:vscode:windows:
       - "extensions/vscode/build/*.vsix"
     expire_in: 1 week
 
-# 6. IntelliJ 확장 프로그램 빌드 (Linux Gradle 활용)
+# 5. IntelliJ 확장 프로그램 빌드 (Linux Gradle 활용)
 build:intellij:linux:
   extends: .linux_job
   image: gradle:8.7-jdk17
