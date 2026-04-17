@@ -47,6 +47,7 @@ build:packages:
   artifacts:
     paths:
       - packages/*/out/
+      - packages/*/node_modules/
     expire_in: 1 day
 
 # --- 2. 공유 컴포넌트 빌드 (Shared) ---
@@ -65,7 +66,7 @@ build:core:
 build:gui:
   stage: build:shared
   tags: [windows-runner-luna]
-  needs: ["build:packages"]
+  needs: ["build:packages", "build:core"]
   script:
     - cd gui
     - npm ci
