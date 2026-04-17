@@ -36,7 +36,7 @@ build:packages:
   extends: .linux_job
   stage: prep
   script:
-    - npm ci --install-links
+    - npm ci
     - node ./scripts/build-packages.js
   artifacts:
     paths:
@@ -52,7 +52,7 @@ build:core:
     - build:packages
   script:
     - cd core
-    - npm ci --install-links
+    - npm ci
     - npx tsc --noEmit
   artifacts:
     paths:
@@ -69,7 +69,7 @@ build:gui:
     NODE_OPTIONS: "--max-old-space-size=4096"
   script:
     - cd gui
-    - npm ci --install-links
+    - npm ci
     - npm run build
   artifacts:
     paths:
@@ -84,7 +84,7 @@ build:binary:windows:
     - build:core
   script:
     - cd binary
-    - npm ci --install-links
+    - npm ci
     - npm run build
   artifacts:
     paths:
@@ -101,7 +101,7 @@ build:vscode:windows:
     - build:binary:windows
   script:
     - cd extensions/vscode
-    - npm ci --install-links
+    - npm ci
     - npm run package
   artifacts:
     paths:
