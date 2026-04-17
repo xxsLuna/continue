@@ -26,6 +26,8 @@ default:
   image: npm-windows:20.12
   tags:
     - windows-runner-luna
+  variables:
+    NODE_OPTIONS: "--max-old-space-size=4096"
 
 # --- 빌드 단계 정의 ---
 
@@ -65,6 +67,8 @@ build:gui:
   stage: gui
   needs:
     - build:packages
+  variables:
+    NODE_OPTIONS: "--max-old-space-size=4096"
   script:
     - cd gui
     - npm ci --install-links
