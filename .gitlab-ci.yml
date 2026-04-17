@@ -34,7 +34,7 @@ build:packages:
   extends: .linux_job
   stage: prep
   script:
-    - npm ci
+    - npm ci --install-links
     - node ./scripts/build-packages.js
   artifacts:
     paths:
@@ -50,7 +50,7 @@ build:core:
     - build:packages
   script:
     - cd core
-    - npm ci
+    - npm ci --install-links
     - npm run build
   artifacts:
     paths:
@@ -67,7 +67,7 @@ build:gui:
     - build:packages
   script:
     - cd gui
-    - npm ci
+    - npm ci --install-links
     - npm run build
   artifacts:
     paths:
@@ -82,7 +82,7 @@ build:binary:windows:
     - build:core
   script:
     - cd binary
-    - npm ci
+    - npm ci --install-links
     - npm run build
   artifacts:
     paths:
@@ -99,7 +99,7 @@ build:vscode:windows:
     - build:binary:windows
   script:
     - cd extensions/vscode
-    - npm ci
+    - npm ci --install-links
     - npm run package
   artifacts:
     paths:
