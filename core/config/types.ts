@@ -1135,6 +1135,10 @@ declare global {
      */
     useChromiumForDocsCrawling?: boolean;
     modelContextProtocolServers?: MCPOptions[];
+    onlineAgent?: {
+      apiKey: string;
+      baseUrl?: string;
+    };
   }
   
   interface AnalyticsConfig {

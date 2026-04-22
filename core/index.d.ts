@@ -497,7 +497,8 @@ export type MessageModes =
   | "agent"
   | "plan"
   | "background"
-  | "validator";
+  | "validator"
+  | "onlineAgent";
 
 export type ToolStatus =
   | "generating" // Tool call arguments are being streamed from the LLM

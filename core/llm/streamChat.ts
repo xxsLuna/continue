@@ -6,6 +6,7 @@ import { FromCoreProtocol, ToCoreProtocol } from "../protocol";
 import { IMessenger, Message } from "../protocol/messenger";
 import { Telemetry } from "../util/posthog";
 import { TTS } from "../util/tts";
+import OnlineAgent from "./llms/OnlineAgent";
 import { isOutOfStarterCredits } from "./utils/starterCredits";
 
 export async function* llmStreamChat(
@@ -32,7 +33,16 @@ export async function* llmStreamChat(
     messageOptions,
   } = msg.data;
 
-  const model = config.selectedModelByRole.chat;
+  let model = config.selectedModelByRole.chat;
+
+  if ((completionOptions as any)?.provider === "onlineAgent") {
+    model = new OnlineAgent({
+      model: (completionOptions as any).model,
+      apiKey: config.experimental?.onlineAgent?.apiKey,
+      baseUrl: config.experimental?.onlineAgent?.baseUrl,
+      title: msg.data.title,
+    });
+  }
 
   if (!model) {
     throw new Error("No chat model selected");

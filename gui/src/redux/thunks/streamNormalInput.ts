@@ -88,14 +88,24 @@ export const streamNormalInput = createAsyncThunk<
       throw new Error(message);
     }
     const state = getState();
-    const selectedChatModel = selectSelectedChatModel(state);
+    const mode = state.session.mode;
+    let selectedChatModel = selectSelectedChatModel(state);
+
+    if (mode === "onlineAgent") {
+      selectedChatModel = {
+        title: state.session.selectedOnlineAgentName || "Online Agent",
+        provider: "onlineAgent",
+        model: state.session.selectedOnlineAgentId || "unknown",
+        underlyingProviderName: "onlineAgent",
+      } as any;
+    }
 
     if (!selectedChatModel) {
       throw new Error("No chat model selected");
     }
 
     // Get tools and apply model-level overrides (disabled, description, etc.)
-    let activeTools = selectActiveTools(state);
+    let activeTools = mode === "onlineAgent" ? [] : selectActiveTools(state);
     if (selectedChatModel.toolOverrides?.length) {
       const { tools: overriddenTools, errors } = applyToolOverrides(
         activeTools,
@@ -134,7 +144,7 @@ export const streamNormalInput = createAsyncThunk<
 
     // Construct messages (excluding system message)
     const baseSystemMessage = getBaseSystemMessage(
-      state.session.mode,
+      mode,
       selectedChatModel,
       activeTools,
     );
@@ -152,13 +162,26 @@ export const streamNormalInput = createAsyncThunk<
       return { ...item, message: messageWithoutId };
     });
 
-    const { messages, appliedRules, appliedRuleIndex } = constructMessages(
-      withoutMessageIds,
-      systemMessage,
-      state.config.config.rules,
-      state.ui.ruleSettings,
-      systemToolsFramework,
-    );
+    const { messages, appliedRules, appliedRuleIndex } =
+      mode === "onlineAgent"
+        ? {
+            messages: constructMessages(
+              withoutMessageIds,
+              systemMessage,
+              [],
+              {},
+              undefined,
+            ).messages,
+            appliedRules: [],
+            appliedRuleIndex: -1,
+          }
+        : constructMessages(
+            withoutMessageIds,
+            systemMessage,
+            state.config.config.rules,
+            state.ui.ruleSettings,
+            systemToolsFramework,
+          );
 
     // TODO parallel tool calls will cause issues with this
     // because there will be multiple tool messages, so which one should have applied rules?

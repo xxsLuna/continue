@@ -4,6 +4,7 @@ import {
   SparklesIcon,
   SwatchIcon,
   BugAntIcon,
+  GlobeAltIcon,
 } from "@heroicons/react/24/outline";
 import { MessageModes } from "core";
 
@@ -27,5 +28,7 @@ export function ModeIcon({
       return <RocketLaunchIcon className={className} />;
     case "validator":
       return <BugAntIcon className={className} />;
+    case "onlineAgent":
+      return <GlobeAltIcon className={className} />;
   }
 }

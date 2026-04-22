@@ -224,6 +224,8 @@ type SessionState = {
   contextPercentage?: number;
   inlineErrorMessage?: InlineErrorMessageType;
   compactionLoading: Record<number, boolean>; // Track compaction loading by message index
+  selectedOnlineAgentId?: string;
+  selectedOnlineAgentName?: string;
 };
 
 export const INITIAL_SESSION_STATE: SessionState = {
@@ -963,6 +965,15 @@ export const sessionSlice = createSlice({
     setMode: (state, action: PayloadAction<MessageModes>) => {
       state.mode = action.payload;
     },
+    setSelectedOnlineAgent: (
+      state,
+      {
+        payload,
+      }: PayloadAction<{ id: string | undefined; name: string | undefined }>,
+    ) => {
+      state.selectedOnlineAgentId = payload.id;
+      state.selectedOnlineAgentName = payload.name;
+    },
     setIsInEdit: (state, action: PayloadAction<boolean>) => {
       state.isInEdit = action.payload;
     },
@@ -1093,6 +1104,7 @@ export const {
   setIsPruned,
   setContextPercentage,
   setCompactionLoading,
+  setSelectedOnlineAgent,
 } = sessionSlice.actions;
 
 export const { selectIsGatheringContext } = sessionSlice.selectors;

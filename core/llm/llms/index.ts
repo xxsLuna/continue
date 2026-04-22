@@ -71,6 +71,7 @@ import Voyage from "./Voyage";
 import WatsonX from "./WatsonX";
 import xAI from "./xAI";
 import zAI from "./zAI";
+import { OnlineAgent } from "./OnlineAgent";
 export const LLMClasses = [
   Anthropic,
   Cohere,
@@ -134,6 +135,7 @@ export const LLMClasses = [
   LlamaStack,
   TARS,
   zAI,
+  OnlineAgent,
 ];
 
 export async function llmFromDescription(

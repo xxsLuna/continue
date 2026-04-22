@@ -231,6 +231,11 @@ function ModelSelect() {
   }
 
   const hasNoModels = allModels?.length === 0;
+  const mode = useAppSelector((state) => state.session.mode);
+
+  if (mode === "onlineAgent") {
+    return null;
+  }
 
   return (
     <Listbox
